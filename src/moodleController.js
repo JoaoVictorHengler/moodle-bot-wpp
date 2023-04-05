@@ -1,88 +1,157 @@
 const puppeteer = require('puppeteer');
 
 class MoodleController {
-    constructor(ra, senha) {
-        this.licoes = [];
+    constructor(ra, passwd) {
+        this.browser = null;
+        this.lessons = [];
         this.ra = ra;
-        this.senha = senha;
+        this.password = passwd;
     }
 
-    async getLogin() {
-        if (this.ra != "" || this.senha != "") {
-            /*
-                console.log("Informações de login:");
-                console.log(`RA: ${this.ra}`);
-                console.log(`Senha: ${this.senha}`);
-            */
-            
-            await this.connect();
-            console.log("Login carregado com sucesso!");
-            return;
-            
-        }
-
-        console.log("Informações de login não encontradas. Favor verificar.");
+    async main() {
+        await this.connect();
+        await this.getLessons();
+        return this.lessons;
     }
+
 
     async connect() {
-        // Conectar no moodle
-        const browser = await puppeteer.launch(
+        // Connect to Moodle
+        this.browser = await puppeteer.launch(
             {
-                headless: false, //false - Visivel | true - Invisivel
+                headless: true, //false - Visible | true - Invisible
             }
         );
-        const home = await browser.newPage();
-        await home.goto("https://moodle.sptech.school/login/index.php");
+        const page = await this.browser.newPage();
+        await page.goto("https://moodle.sptech.school/login/index.php");
 
-        await home.type("#username", this.ra);
-        await home.type("#password", this.senha);
-        await home.click("#loginbtn");
-        
-        await home.close();
+        await page.type("#username", this.ra);
+        await page.type("#password", this.password);
+        await page.click("#loginbtn");
 
-        const painel = await browser.newPage();
-        await painel.goto("https://moodle.sptech.school/my/");
-        await painel.click(".btnFechar");
-        const licoes = await painel.$$eval(".card-text content calendarwrapper", (elLicoes) => {
-            let licoes = elLicoes.map((elLicao) => {
-                return {
-                    titulo: elLicao.querySelector("a").innerHTML,
-                    data: elLicao.querySelector(".date > a").innerHTML,
-                    hora: elLicao.querySelector(".date").innerText.split(">")[1].trim()
-                }
-            });
+        await page.waitForSelector(".user-firstname");
+        await page.close();
 
-            elLicoes.forEach(async (elLicao, i) => {
-                elLicao.querySelector(".date > a").click();
-                await painel.waitFor(1000);
+        // Validar login se funcionar
+        console.log("Conectado com sucesso!");
+    }
 
-                licoes[i].materia = await painel.$$eval(".summary-modal-container", (elHandles) => {
-                    return elHandles[0].querySelector(".row mt-1:nth-child(4) > .col-11 > a").innerHTML;
+    async getLessons() {
+        const page = await this.browser.newPage();
+        await page.goto("https://moodle.sptech.school/calendar/view.php?view=upcoming");
+
+        this.lessons = await page.$$eval(".eventlist.my-1 > div", async (elLessons) => {
+            function transformTxt(title) {
+                let restrictions = [
+                    "Atividade - ",
+                    " está marcado(a) para esta data"
+                ];
+
+                restrictions.forEach((restriction) => {
+                    title = title.replace(restriction, "");
                 });
 
-                await painel.click(".btnFechar");
-            });
+                if (title.includes("Término de OpenLab - Produtividade - ")) {
+                    title = title.replace("Término de OpenLab - Produtividade - ", "OpenLab - ");
+                }
 
-            return licoes;
-        });
-        console.log(licoes);
-
-        await browser.close();
-    }
-
-    getLicoes() {
-        /* 
-            {
-                titulo: "Design de Interação - Desk Research";
-                data: "05/04/2022"
+                return title.trim();
             }
-        */
-    }
 
-    mapHtmlToJson() {
-        // Mapear as lições do html para o json
+            function transformDate(date, hour) {
+                let restrictions = [
+                    "Monday, ",
+                    "Tuesday, ",
+                    "Wednesday, ",
+                    "Thursday, ",
+                    "Friday, ",
+                    "Saturday, ",
+                    "Sunday, ",
+                ];
+
+                let monthsEnglish = [
+                    "January",
+                    "February",
+                    "March",
+                    "April",
+                    "May",
+                    "June",
+                    "July",
+                    "August",
+                    "September",
+                    "October",
+                    "November",
+                    "December"
+                ];
+
+                let monthsPortuguese = [
+                    "Janeiro",
+                    "Fevereiro",
+                    "Março",
+                    "Abril",
+                    "Maio",
+                    "Junho",
+                    "Julho",
+                    "Agosto",
+                    "Setembro",
+                    "Outubro",
+                    "Novembro",
+                    "Dezembro"
+                ];
+
+                if (date.includes("Hoje")) {
+                    let realDate = new Date();
+                    realDate.setHours(hour.split(":")[0], hour.split(":")[1], 0, 0);
+                    let now = new Date()
+                    return "Daqui " + differenceBetweenTimes(now, realDate);
+
+                } else if (date.includes("Amanhã")) return "Amanhã às " + hour;
+                else {
+                    restrictions.forEach((restriction) => {
+                        date = date.replace(restriction, "").trim();
+                    });
+
+                    monthsEnglish.forEach((month, i) => {
+                        date = date.replace(month, `de ${monthsPortuguese[i]}`).trim();
+                    });
+                    return date + " às " + hour;
+                }
+            }
+
+            function differenceBetweenTimes(date1, date2) {
+                var msec = date2.getTime() - date1.getTime();
+                var hh = Math.floor(msec / 1000 / 60 / 60);
+                msec -= hh * 1000 * 60 * 60;
+                var mm = Math.floor(msec / 1000 / 60);
+                msec -= mm * 1000 * 60;
+                var ss = Math.floor(msec / 1000);
+                msec -= ss * 1000;
+
+                if (hh < 10) hh = "0" + hh;
+                if (mm < 10) mm = "0" + mm;
+                if (ss < 10) ss = "0" + ss;
+                
+                return `${hh}:${mm}:${ss}`;
+            }
+
+            return elLessons.map((elLesson) => {
+                const description = elLesson.querySelector(".description.card-body");
+                let dateTimeElement = description.querySelector(".row:nth-child(1)");
+                let date = dateTimeElement.querySelector(".col-11 a").innerHTML;
+                let hour = dateTimeElement.querySelector(".col-11").innerHTML.split(">,")[1].replace("</span>", "").trim().replace("PM", "").replace("AM", "").trim();
+                let rows = description.querySelectorAll(".mt-1");
+
+                return {
+                    title: transformTxt(elLesson.querySelector("div > div > div:nth-child(3) > h3").innerHTML),
+                    date: transformDate(date, hour),
+                    course: rows[rows.length - 1].querySelector(".col-11 a").innerHTML.replace("2CCOA - ", "").replace("2023/1", "").trim()
+                };
+            });
+        });
+
+        await page.close();
+        await this.browser.close();
     }
 }
 
-var moodleController = new MoodleController("", "");
-moodleController.getLogin();
+module.exports = MoodleController;
