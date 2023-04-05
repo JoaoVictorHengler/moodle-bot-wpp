@@ -6,150 +6,173 @@ class MoodleController {
         this.lessons = [];
         this.ra = ra;
         this.password = passwd;
+        this.connected = false;
+        this.gotLessons = false;
     }
 
     async main() {
         await this.connect();
         await this.getLessons();
+
         return this.lessons;
     }
 
 
     async connect() {
         // Connect to Moodle
-        this.browser = await puppeteer.launch(
-            {
-                headless: true, //false - Visible | true - Invisible
+        try {
+            this.browser = await puppeteer.launch(
+                {
+                    headless: true, //false - Visible | true - Invisible
+                }
+            );
+            const page = await this.browser.newPage();
+            await page.goto("https://moodle.sptech.school/login/index.php");
+
+            await page.type("#username", this.ra);
+            await page.type("#password", this.password);
+            await page.click("#loginbtn");
+
+
+            let element = await page.waitForSelector(".user-firstname");
+            if (element == null) {
+                console.log("Erro ao conectar ao Moodle.");
+                return;
             }
-        );
-        const page = await this.browser.newPage();
-        await page.goto("https://moodle.sptech.school/login/index.php");
 
-        await page.type("#username", this.ra);
-        await page.type("#password", this.password);
-        await page.click("#loginbtn");
+            await page.close();
 
-        await page.waitForSelector(".user-firstname");
-        await page.close();
-
-        // Validar login se funcionar
-        console.log("Conectado com sucesso!");
+            this.connected = true;
+            console.log("Conectado com sucesso!");
+        } catch (e) {
+            console.log("Erro ao conectar ao Moodle.");
+            return;
+        }
     }
 
     async getLessons() {
-        const page = await this.browser.newPage();
-        await page.goto("https://moodle.sptech.school/calendar/view.php?view=upcoming");
+        if (!this.connected) return;
+        try {
+            console.log("Iniciando página de lições do moodle...");
+            const page = await this.browser.newPage();
+            await page.goto("https://moodle.sptech.school/calendar/view.php?view=upcoming");
 
-        this.lessons = await page.$$eval(".eventlist.my-1 > div", async (elLessons) => {
-            function transformTxt(title) {
-                let restrictions = [
-                    "Atividade - ",
-                    " está marcado(a) para esta data"
-                ];
+            console.log("Buscando próximas lições...");
+            this.lessons = await page.$$eval(".eventlist.my-1 > div", async (elLessons) => {
+                function transformTxt(title) {
+                    let restrictions = [
+                        "Atividade - ",
+                        " está marcado(a) para esta data"
+                    ];
 
-                restrictions.forEach((restriction) => {
-                    title = title.replace(restriction, "");
-                });
-
-                if (title.includes("Término de OpenLab - Produtividade - ")) {
-                    title = title.replace("Término de OpenLab - Produtividade - ", "OpenLab - ");
-                }
-
-                return title.trim();
-            }
-
-            function transformDate(date, hour) {
-                let restrictions = [
-                    "Monday, ",
-                    "Tuesday, ",
-                    "Wednesday, ",
-                    "Thursday, ",
-                    "Friday, ",
-                    "Saturday, ",
-                    "Sunday, ",
-                ];
-
-                let monthsEnglish = [
-                    "January",
-                    "February",
-                    "March",
-                    "April",
-                    "May",
-                    "June",
-                    "July",
-                    "August",
-                    "September",
-                    "October",
-                    "November",
-                    "December"
-                ];
-
-                let monthsPortuguese = [
-                    "Janeiro",
-                    "Fevereiro",
-                    "Março",
-                    "Abril",
-                    "Maio",
-                    "Junho",
-                    "Julho",
-                    "Agosto",
-                    "Setembro",
-                    "Outubro",
-                    "Novembro",
-                    "Dezembro"
-                ];
-
-                if (date.includes("Hoje")) {
-                    let realDate = new Date();
-                    realDate.setHours(hour.split(":")[0], hour.split(":")[1], 0, 0);
-                    let now = new Date()
-                    return "Daqui " + differenceBetweenTimes(now, realDate);
-
-                } else if (date.includes("Amanhã")) return "Amanhã às " + hour;
-                else {
                     restrictions.forEach((restriction) => {
-                        date = date.replace(restriction, "").trim();
+                        title = title.replace(restriction, "");
                     });
 
-                    monthsEnglish.forEach((month, i) => {
-                        date = date.replace(month, `de ${monthsPortuguese[i]}`).trim();
-                    });
-                    return date + " às " + hour;
+                    if (title.includes("Término de OpenLab - Produtividade - ")) {
+                        title = title.replace("Término de OpenLab - Produtividade - ", "OpenLab - ");
+                    }
+
+                    return title.trim();
                 }
-            }
 
-            function differenceBetweenTimes(date1, date2) {
-                var msec = date2.getTime() - date1.getTime();
-                var hh = Math.floor(msec / 1000 / 60 / 60);
-                msec -= hh * 1000 * 60 * 60;
-                var mm = Math.floor(msec / 1000 / 60);
-                msec -= mm * 1000 * 60;
-                var ss = Math.floor(msec / 1000);
-                msec -= ss * 1000;
+                function transformDate(date, hour) {
+                    let restrictions = [
+                        "Monday, ",
+                        "Tuesday, ",
+                        "Wednesday, ",
+                        "Thursday, ",
+                        "Friday, ",
+                        "Saturday, ",
+                        "Sunday, ",
+                    ];
 
-                if (hh < 10) hh = "0" + hh;
-                if (mm < 10) mm = "0" + mm;
-                if (ss < 10) ss = "0" + ss;
-                
-                return `${hh}:${mm}:${ss}`;
-            }
+                    let monthsEnglish = [
+                        "January",
+                        "February",
+                        "March",
+                        "April",
+                        "May",
+                        "June",
+                        "July",
+                        "August",
+                        "September",
+                        "October",
+                        "November",
+                        "December"
+                    ];
 
-            return elLessons.map((elLesson) => {
-                const description = elLesson.querySelector(".description.card-body");
-                let dateTimeElement = description.querySelector(".row:nth-child(1)");
-                let date = dateTimeElement.querySelector(".col-11 a").innerHTML;
-                let hour = dateTimeElement.querySelector(".col-11").innerHTML.split(">,")[1].replace("</span>", "").trim().replace("PM", "").replace("AM", "").trim();
-                let rows = description.querySelectorAll(".mt-1");
+                    let monthsPortuguese = [
+                        "Janeiro",
+                        "Fevereiro",
+                        "Março",
+                        "Abril",
+                        "Maio",
+                        "Junho",
+                        "Julho",
+                        "Agosto",
+                        "Setembro",
+                        "Outubro",
+                        "Novembro",
+                        "Dezembro"
+                    ];
 
-                return {
-                    title: transformTxt(elLesson.querySelector("div > div > div:nth-child(3) > h3").innerHTML),
-                    date: transformDate(date, hour),
-                    course: rows[rows.length - 1].querySelector(".col-11 a").innerHTML.replace("2CCOA - ", "").replace("2023/1", "").trim()
-                };
+                    if (date.includes("Hoje")) {
+                        let realDate = new Date();
+                        realDate.setHours(hour.split(":")[0], hour.split(":")[1], 0, 0);
+                        let now = new Date()
+                        return "Daqui " + differenceBetweenTimes(now, realDate);
+
+                    } else if (date.includes("Amanhã")) return "Amanhã às " + hour;
+                    else {
+                        restrictions.forEach((restriction) => {
+                            date = date.replace(restriction, "").trim();
+                        });
+
+                        monthsEnglish.forEach((month, i) => {
+                            date = date.replace(month, `de ${monthsPortuguese[i]}`).trim();
+                        });
+                        return date + " às " + hour;
+                    }
+                }
+
+                function differenceBetweenTimes(date1, date2) {
+                    var msec = date2.getTime() - date1.getTime();
+                    var hh = Math.floor(msec / 1000 / 60 / 60);
+                    msec -= hh * 1000 * 60 * 60;
+                    var mm = Math.floor(msec / 1000 / 60);
+                    msec -= mm * 1000 * 60;
+                    var ss = Math.floor(msec / 1000);
+                    msec -= ss * 1000;
+
+                    if (hh < 10) hh = "0" + hh;
+                    if (mm < 10) mm = "0" + mm;
+                    if (ss < 10) ss = "0" + ss;
+
+                    return `${hh}:${mm}:${ss}`;
+                }
+
+                return elLessons.map((elLesson) => {
+                    const description = elLesson.querySelector(".description.card-body");
+                    let dateTimeElement = description.querySelector(".row:nth-child(1)");
+                    let date = dateTimeElement.querySelector(".col-11 a").innerHTML;
+                    let hour = dateTimeElement.querySelector(".col-11").innerHTML.split(">,")[1].replace("</span>", "").trim().replace("PM", "").replace("AM", "").trim();
+                    let rows = description.querySelectorAll(".mt-1");
+
+                    return {
+                        title: transformTxt(elLesson.querySelector("div > div > div:nth-child(3) > h3").innerHTML),
+                        date: transformDate(date, hour),
+                        course: rows[rows.length - 1].querySelector(".col-11 a").innerHTML.replace("2CCOA - ", "").replace("2023/1", "").trim()
+                    };
+                });
             });
-        });
-
-        await page.close();
+            console.log("Lições carregadas com sucesso!");
+            this.gotLessons = true;
+            await page.close();
+        } catch (e) {
+            return;
+        }
+        
         await this.browser.close();
     }
 }
