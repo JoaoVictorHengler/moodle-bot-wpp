@@ -27,7 +27,7 @@ function verifyConfig() {
 function runClient() {
     const client = new Client({
         puppeteer: {
-            headless: false, // false - Visible | true - Invisible
+            headless: true, // false - Visible | true - Invisible
             args: ['--no-sandbox']
         },
         authStrategy: new LocalAuth()
