@@ -4,7 +4,6 @@ const fs = require('fs');
 const MoodleController = require('./src/moodleController');
 
 var config;
-const RUN_WITHOUT_CLIENT = true;
 
 function main() {
     if (!verifyConfig()) return;
@@ -18,7 +17,8 @@ function verifyConfig() {
             {
                 ra: "RA",
                 password: "Senha",
-                chatName: "Nome do Grupo"
+                chatName: "Nome do Grupo",
+                sendMsg: true
             }));
 
         console.log("Arquivo de config não encontrado. Criando...");
@@ -31,7 +31,7 @@ function verifyConfig() {
 }
 
 function runClient() {
-    if (!RUN_WITHOUT_CLIENT) {
+    if (config.sendMsg) {
         const client = new Client({
             puppeteer: {
                 headless: true, // false - Visible | true - Invisible
@@ -65,26 +65,26 @@ async function getNextLessons(client) {
     let lessons = await moodleController.main();
 
     if (!moodleController.connected) {
-        if (!RUN_WITHOUT_CLIENT) await client.sendMessage(config.chatName, "Ocorreu um erro ao tentar conectar ao Moodle.");
+        if (config.sendMsg) await client.sendMessage(config.chatName, "Ocorreu um erro ao tentar conectar ao Moodle.");
     } else {
         console.log("Requisição finalizada!");
         if (!moodleController.gotLessons) {
             console.log("Ocorreu um erro ao tentar buscar as lições.");
-            if (!RUN_WITHOUT_CLIENT) await client.sendMessage(config.chatName, "Ocorreu um erro ao tentar buscar as lições.");
+            if (config.sendMsg) await client.sendMessage(config.chatName, "Ocorreu um erro ao tentar buscar as lições.");
         }
         else if (lessons.length == 0) {
             console.log("Nenhuma lição encontrada!");
-            if (!RUN_WITHOUT_CLIENT) await client.sendMessage(config.chatName, "Nenhuma lição encontrada!");
+            if (config.sendMsg) await client.sendMessage(config.chatName, "Nenhuma lição encontrada!");
         }
         else {
             let msg = createMsg(lessons);
             console.log("Mensagem: \n" + msg + "\n");
-            if (!RUN_WITHOUT_CLIENT) await sendMsg(client, msg);
+            if (config.sendMsg) await sendMsg(client, msg);
         }
         
     }
     
-    if (!RUN_WITHOUT_CLIENT) {
+    if (config.sendMsg) {
         console.log("Finalizando cliente em 5 segundos...");
         setTimeout(() => client.destroy(), 5000);
     }
@@ -115,7 +115,7 @@ function createMsg(lessons) {
                 appndMsg = `${jumpMsg}      • ${lesson.title}: *${lesson.date}*`;
             } */
 
-            msg += `${jumpMsg}      • ${lesson.title}: *${lesson.date}*`;;
+            msg += `${jumpMsg}      • ${lesson.title}: \n      *${lesson.date}*`;;
 
         });
     }
