@@ -121,7 +121,10 @@ class MoodleController {
                         let realDate = new Date();
                         realDate.setHours(hour.split(":")[0], hour.split(":")[1], 0, 0);
                         let now = new Date()
-                        return "Daqui " + differenceBetweenTimes(now, realDate);
+                        let difference = differenceBetweenTimes(now, realDate)
+                        
+                        if (difference.includes("-")) return `Era para ser entregue há ${difference.replace("-", "")}`;
+                        else return `Daqui ${difference}`;
 
                     } else if (date.includes("Amanhã")) return "Amanhã às " + hour;
                     else {
@@ -144,6 +147,7 @@ class MoodleController {
                     msec -= mm * 1000 * 60;
                     var ss = Math.floor(msec / 1000);
                     msec -= ss * 1000;
+
 
                     if (hh < 10) hh = "0" + hh;
                     if (mm < 10) mm = "0" + mm;

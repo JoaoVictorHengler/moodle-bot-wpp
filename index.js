@@ -2,6 +2,7 @@ const qrcode = require('qrcode-terminal');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const fs = require('fs');
 const MoodleController = require('./src/moodleController');
+const CONFIG_PATH = './config.json';
 
 var config;
 
@@ -12,8 +13,8 @@ function main() {
 }
 
 function verifyConfig() {
-    if (!fs.existsSync('config.json')) {
-        fs.writeFileSync('config.json', JSON.stringify(
+    if (!fs.existsSync(CONFIG_PATH)) {
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(
             {
                 ra: "RA",
                 password: "Senha",
@@ -25,33 +26,39 @@ function verifyConfig() {
         return false;
     }
 
-    config = JSON.parse(fs.readFileSync('config.json'));
+    config = JSON.parse(fs.readFileSync(CONFIG_PATH));
 
     return true;
 }
 
 function runClient() {
     if (config.sendMsg) {
-        const client = new Client({
-            puppeteer: {
-                headless: true, // false - Visible | true - Invisible
-                args: ['--no-sandbox']
-            },
-            authStrategy: new LocalAuth()
-        });
+        try {
+            const client = new Client({
+                puppeteer: {
+                    headless: true, // false - Visible | true - Invisible
+                    args: ['--no-sandbox']
+                },
+                authStrategy: new LocalAuth()
+            });
+            
+            client.on('qr', qr => {
+                qrcode.generate(qr, { small: true });
+            });
+        
+            client.on('ready', async () => {
+                console.log('Cliente Whatsapp Iniciado.');
+                getNextLessons(client);
+        
+            });
+        
+            client.initialize();
+            console.log("Iniciando cliente...");
+        } catch(error) {
+            console.log("Ocorreu um erro ao tentar iniciar o cliente: " + error)
+        }
     
-        client.on('qr', qr => {
-            qrcode.generate(qr, { small: true });
-        });
-    
-        client.on('ready', async () => {
-            console.log('Cliente Whatsapp Iniciado.');
-            getNextLessons(client);
-    
-        });
-    
-        client.initialize();
-        console.log("Iniciando cliente...");
+        
     } else {
         getNextLessons(null);
     }

@@ -1,3 +1,4 @@
 node_modules/
 config.json
 .wwebjs_auth/
+script.sh
