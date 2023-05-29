@@ -36,7 +36,7 @@ function runClient() {
         try {
             const client = new Client({
                 puppeteer: {
-                    headless: true, // false - Visible | true - Invisible
+                    headless: false, // false - Visible | true - Invisible
                     args: ['--no-sandbox']
                 },
                 authStrategy: new LocalAuth()
@@ -72,16 +72,16 @@ async function getNextLessons(client) {
     let lessons = await moodleController.main();
 
     if (!moodleController.connected) {
-        if (config.sendMsg) await client.sendMessage(config.chatName, "Ocorreu um erro ao tentar conectar ao Moodle.");
+        if (config.sendMsg) await sendMsg(client, "Ocorreu um erro ao tentar conectar ao Moodle.");
     } else {
         console.log("Requisição finalizada!");
         if (!moodleController.gotLessons) {
             console.log("Ocorreu um erro ao tentar buscar as lições.");
-            if (config.sendMsg) await client.sendMessage(config.chatName, "Ocorreu um erro ao tentar buscar as lições.");
+            if (config.sendMsg) await sendMsg(client, "Ocorreu um erro ao tentar buscar as lições.");
         }
         else if (lessons.length == 0) {
             console.log("Nenhuma lição encontrada!");
-            if (config.sendMsg) await client.sendMessage(config.chatName, "Nenhuma lição encontrada!");
+            if (config.sendMsg) await sendMsg(client, "Nenhuma lição encontrada!");
         }
         else {
             let msg = createMsg(lessons);
@@ -93,7 +93,10 @@ async function getNextLessons(client) {
     
     if (config.sendMsg) {
         console.log("Finalizando cliente em 5 segundos...");
-        setTimeout(() => client.destroy(), 5000);
+        setTimeout(() => {
+            client.destroy();
+            process.exit();
+        }, 5000);
     }
     
 }
