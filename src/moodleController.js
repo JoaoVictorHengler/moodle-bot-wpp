@@ -62,7 +62,8 @@ class MoodleController {
                 function transformTxt(title) {
                     let restrictions = [
                         "Atividade - ",
-                        " está marcado(a) para esta data"
+                        " está marcado(a) para esta data",
+                        "´"
                     ];
 
                     restrictions.forEach((restriction) => {
@@ -71,6 +72,29 @@ class MoodleController {
 
                     if (title.includes("Término de OpenLab - Produtividade - ")) {
                         title = title.replace("Término de OpenLab - Produtividade - ", "OpenLab - ");
+                    }
+
+                    let txtSeparado = title.split('-');
+                    let novoTextoSeparado = []
+                    if (txtSeparado.length > 1) {
+                        txtSeparado.forEach((txt, i) => {
+                            let txt2 = txt.toLowerCase()
+                            if (!(txt2.includes("open lab") |
+                                txt2.includes("entrega") |
+                                txt2.includes("entrega") |
+                                txt2.includes("prova") |
+                                txt2.includes("aula"))) {
+                                    novoTextoSeparado.push(txt)
+                            }
+                        })
+                    } else {
+                        novoTextoSeparado.push(txtSeparado[0])
+                    }
+
+                    title = novoTextoSeparado.join(' - ').replaceAll("  ", " ");
+
+                    if (title === title.toUpperCase()) {
+                        title = title.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
                     }
 
                     return title.trim();
@@ -157,17 +181,21 @@ class MoodleController {
                 }
 
                 return elLessons.map((elLesson) => {
-                    const description = elLesson.querySelector(".description.card-body");
-                    let dateTimeElement = description.querySelector(".row:nth-child(1)");
-                    let date = dateTimeElement.querySelector(".col-11 a").innerHTML;
-                    let hour = dateTimeElement.querySelector(".col-11").innerHTML.split(">,")[1].replace("</span>", "").trim().replace("PM", "").replace("AM", "").trim();
-                    let rows = description.querySelectorAll(".mt-1");
 
-                    return {
-                        title: transformTxt(elLesson.querySelector("div > div > div:nth-child(3) > h3").innerHTML),
-                        date: transformDate(date, hour),
-                        course: rows[rows.length - 1].querySelector(".col-11 a").innerHTML.replace("2CCOA - ", "").replace("2023/1", "").trim()
-                    };
+                    let title = transformTxt(elLesson.querySelector("div > div > div:nth-child(3) > h3").innerHTML)
+                    if (!title.includes("Feriado")) {
+                        const description = elLesson.querySelector(".description.card-body");
+                        let dateTimeElement = description.querySelector(".row:nth-child(1)");
+                        let date = dateTimeElement.querySelector(".col-11 a").innerHTML;
+                        let hour = dateTimeElement.querySelector(".col-11").innerHTML.split(">,")[1].replace("</span>", "").trim().replace("PM", "").replace("AM", "").trim();
+                        let rows = description.querySelectorAll(".mt-1");
+
+                        return {
+                            title: title,
+                            date: transformDate(date, hour),
+                            course: rows[rows.length - 1].querySelector(".col-11 a").innerHTML.replace("3CCOA - ", "").replace("2024/1", "").replace("2024", "").trim()
+                        };
+                    }
                 });
             });
             console.log("Lições carregadas com sucesso!");
